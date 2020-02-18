@@ -11,5 +11,6 @@
       <Label fx:id="lbFileName" layoutX="14.0" layoutY="71.0" prefHeight="17.0" prefWidth="136.0" />
       <Button fx:id="btSignUp" layoutX="14.0" layoutY="143.0" mnemonicParsing="false" onMouseClicked="#signUpEvent" prefHeight="25.0" prefWidth="136.0" text="Зарегистрировать" />
       <TableView fx:id="viewTable" layoutX="169.0" layoutY="28.0" prefHeight="700.0" prefWidth="1095.0" />
+      <Label fx:id="lbStatus" layoutX="14.0" layoutY="187.0" prefHeight="37.0" prefWidth="136.0" />
    </children>
 </AnchorPane>

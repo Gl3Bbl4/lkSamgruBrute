@@ -10,6 +10,7 @@ import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.input.MouseEvent;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import junit.runner.Version;
 import org.apache.http.Consts;
 import org.apache.http.HttpEntity;
 import org.apache.http.NameValuePair;
@@ -37,7 +38,7 @@ import java.net.URL;
 import java.util.*;
 
 
-public class Controller {
+public class Controller implements Runnable {
 
     @FXML
     private ResourceBundle resources;
@@ -57,6 +58,9 @@ public class Controller {
     @FXML
     private Button btSignUp;
 
+    @FXML
+    private Label lbStatus;
+
     public final String VOSTANOVLENIE_PASSWORD = "Вы уже зарегистрированы в системе." +
             " Повторная регистрация не допускается! " +
             "Можете попробовать восстановить пароль, либо обратиться";
@@ -67,67 +71,93 @@ public class Controller {
     File fileObject;
     List<Profile> listProfile = new ArrayList<>();
     Profile newProfile;
+    ObservableList<Profile> list = null;
+
+    class UpdateTable extends Thread {
+        @Override
+        public void run() {
+            viewTable.refresh();
+        }
+    }
 
     @FXML
-    void signUpEvent(MouseEvent event) throws IOException {
+    void signUpEvent(MouseEvent event) throws IOException, InterruptedException {
+        if (list != null) {
+            ObservableList<Profile> listUpdate = FXCollections.observableArrayList(listProfile);
+            lbStatus.setText("Идет регистрация");
+            for (Profile profile : list) {
+//            Profile profile = list.get(0);
 
-        try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+                try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 
-            List<NameValuePair> form = new ArrayList<>();
-            /************************************ LOGIN ******************************************/
+                    List<NameValuePair> form = new ArrayList<>();
+                    /************************************ LOGIN ******************************************/
 
 //            form.add(new BasicNameValuePair("LoginForm[username]", "borisenko.gi"));
 //            form.add(new BasicNameValuePair("LoginForm[password]", "121233"));
 //            form.add(new BasicNameValuePair("LoginForm[rememberMe]", "0"));
 //            form.add(new BasicNameValuePair("LoginForm[rememberMe]", "1"));
 
-            /************************************************************************************/
+                    /************************************************************************************/
 
-            /*********************************** SIGNUP ******************************************/
+                    form.add(new BasicNameValuePair("SignupFormNew[email]", profile.getEmail()));
+                    form.add(new BasicNameValuePair("SignupFormNew[Cellular]", profile.getCellular()));
+                    form.add(new BasicNameValuePair("SignupFormNew[LastName]", profile.getLastName()));
+                    form.add(new BasicNameValuePair("SignupFormNew[FirstName]", profile.getFirstName()));
+                    form.add(new BasicNameValuePair("SignupFormNew[Gender]", "0"));
+                    form.add(new BasicNameValuePair("SignupFormNew[Gender]", "0"));
+                    form.add(new BasicNameValuePair("SignupFormNew[MiddleName]", profile.getMiddleName()));
+                    form.add(new BasicNameValuePair("SignupFormNew[BirthDate]", profile.getBirthDate()));
+                    form.add(new BasicNameValuePair("SignupFormNew[DocumentTypeID]", "1"));
+                    form.add(new BasicNameValuePair("SignupFormNew[DocumentNumber]", profile.getDocumentNumber()));
+                    form.add(new BasicNameValuePair("SignupFormNew[Agreement]", "0"));
+                    form.add(new BasicNameValuePair("SignupFormNew[Agreement]", "1"));
 
-            form.add(new BasicNameValuePair("SignupFormNew[email]", "gfm44nawwar@mail.ru"));
-            form.add(new BasicNameValuePair("SignupFormNew[Cellular]", "8(921)814-01-29"));
-            form.add(new BasicNameValuePair("SignupFormNew[LastName]", "Абакумова"));
-            form.add(new BasicNameValuePair("SignupFormNew[FirstName]", "Вера"));
-            form.add(new BasicNameValuePair("SignupFormNew[Gender]", "0"));
-            form.add(new BasicNameValuePair("SignupFormNew[Gender]", "0"));
-            form.add(new BasicNameValuePair("SignupFormNew[MiddleName]", "Александровна"));
-            form.add(new BasicNameValuePair("SignupFormNew[BirthDate]", "14.02.2001"));
-            form.add(new BasicNameValuePair("SignupFormNew[DocumentTypeID]", "1"));
-            form.add(new BasicNameValuePair("SignupFormNew[DocumentNumber]", "18140129"));
-            form.add(new BasicNameValuePair("SignupFormNew[Agreement]", "0"));
-            form.add(new BasicNameValuePair("SignupFormNew[Agreement]", "1"));
 
-            /****************************************************************************************/
+                    UrlEncodedFormEntity entity = new UrlEncodedFormEntity(form, Consts.UTF_8);
 
-            UrlEncodedFormEntity entity = new UrlEncodedFormEntity(form, Consts.UTF_8);
+                    HttpPost httpPost = new HttpPost("https://lk.samgtu.ru/site/signup");
+                    httpPost.setEntity(entity);
+                    System.out.println("Executing request " + httpPost.getRequestLine());
 
-            HttpPost httpPost = new HttpPost("https://lk.samgtu.ru/site/signup");
-            httpPost.setEntity(entity);
-            System.out.println("Executing request " + httpPost.getRequestLine());
+                    // Create a custom response handler
+                    ResponseHandler<String> responseHandler = response -> {
+                        int status = response.getStatusLine().getStatusCode();
+                        if (status >= 200 && status < 300) {
+                            HttpEntity responseEntity = response.getEntity();
+                            return responseEntity != null ? EntityUtils.toString(responseEntity) : null;
+                        } else {
+                            throw new ClientProtocolException("Unexpected response status: " + status);
+                        }
+                    };
+                    String responseBody = httpclient.execute(httpPost, responseHandler);
+                    System.out.println("----------------------------------------");
+                    //    System.out.println(responseBody);
 
-            // Create a custom response handler
-            ResponseHandler<String> responseHandler = response -> {
-                int status = response.getStatusLine().getStatusCode();
-                if (status >= 200 && status < 300) {
-                    HttpEntity responseEntity = response.getEntity();
-                    return responseEntity != null ? EntityUtils.toString(responseEntity) : null;
-                } else {
-                    throw new ClientProtocolException("Unexpected response status: " + status);
+                    if (responseBody.lastIndexOf(VOSTANOVLENIE_PASSWORD) != -1) {
+                        System.out.println("Такой пользователь уже зарегистрирован");
+                        profile.setStatus("Существует");
+
+                    } else if (responseBody.lastIndexOf(DONT_EXISTS) != -1) {
+                        System.out.println("Не найден ни в одной базе");
+                        profile.setStatus("Не существует");
+
+                    } else {
+                        System.out.println("Может быть зарегистрирован");
+                        profile.setStatus("Не зарегистрирован");
+
+                    }
+                    UpdateTable updateTable = new UpdateTable();
+                    updateTable.start();
+                    updateTable.join();
+                } catch (Exception e) {
+                    System.out.println("упс...");
                 }
-            };
-            String responseBody = httpclient.execute(httpPost, responseHandler);
-            System.out.println("----------------------------------------");
-        //    System.out.println(responseBody);
-            if (responseBody.lastIndexOf(VOSTANOVLENIE_PASSWORD) != -1) {
-                System.out.println("Такой пользователь уже зарегистрирован");
-            } else if(responseBody.lastIndexOf(DONT_EXISTS) != -1) {
-                System.out.println("Не найден ни в одной базе");
-            } else {
-                System.out.println("Может быть зарегистрирован");
+                viewTable.refresh();
+
             }
-        } catch (Exception e) {
-            System.out.println("упс...");
+        } else {
+            lbStatus.setText("Не выбран файл");
         }
     }
 
@@ -186,7 +216,6 @@ public class Controller {
                             break;
 
                         case 6:
-                            newProfile.setDocumentTypeId("1");
                             newProfile.setDocumentNumber(cellIterator.next().getNumericCellValue());
                             break;
 
@@ -219,8 +248,9 @@ public class Controller {
         Cell cell;
         Row row;
 
+        int id = -1;
         while (rowIterator.hasNext()) {
-
+            id++;
             row = rowIterator.next();
             if (row_col == 0) {
                 row_col++;
@@ -233,6 +263,7 @@ public class Controller {
                 for (cell_col = 0; cell_col < 20; cell_col++) {
                     switch (cell_col) {
                         case 0:
+                            newProfile.setId(id);
                             String pars = cellIterator.next().getStringCellValue();
 
                             List<String> listFIO = new ArrayList<>();
@@ -274,7 +305,6 @@ public class Controller {
                             break;
 
                         case 6:
-                            newProfile.setDocumentTypeId("1");
                             cell = cellIterator.next();
                             if (cell.getCellType() != CellType.NUMERIC) {
                                 newProfile.setDocumentNumberStr(cell.getStringCellValue());
@@ -312,11 +342,13 @@ public class Controller {
         }
     }
 
-    public void setViewTable() {
+    public void setViewTable(boolean first) {
+        lbStatus.setText("Создание таблицы...");
         viewTable.getItems().clear();
-        ObservableList<Profile> list = null;
+        list = null;
         list = FXCollections.observableArrayList(listProfile);
         viewTable.setItems(list);
+        lbStatus.setText("");
     }
 
     //Выбор файла
@@ -336,8 +368,8 @@ public class Controller {
         } else {
             lbFileName.setText("");
         }
+        lbStatus.setText("Считывание Excel файла");
         excelRead();
-        System.out.println();
     }
 
     // Считывание Excel файла (2 формата)
@@ -356,7 +388,7 @@ public class Controller {
                 XSSFSheet sheet = workbook.getSheetAt(0);
                 parserExcelXLS(sheet);
             }
-            setViewTable();
+            setViewTable(true);
         } catch (Exception e) {
             System.out.println("Невозможно открыть файл!");
         }
@@ -398,9 +430,13 @@ public class Controller {
         TableColumn<Profile, String> cellularCol
                 = new TableColumn<Profile, String>("Номер телефона");
 
+        TableColumn<Profile, String> statusCol
+                = new TableColumn<Profile, String>("Статус");
+
         viewTable.setEditable(true);
 
         idCol.setCellValueFactory(new PropertyValueFactory<>("id"));
+        surnameCol.setMaxWidth(20);
 
         surnameCol.setCellValueFactory(new PropertyValueFactory<>("lastName"));
         surnameCol.setCellFactory(TextFieldTableCell.<Profile>forTableColumn());
@@ -446,7 +482,7 @@ public class Controller {
 
         dateCol.setCellValueFactory(new PropertyValueFactory<>("birthDate"));
         dateCol.setCellFactory(TextFieldTableCell.<Profile>forTableColumn());
-        dateCol.setMinWidth(90);
+        dateCol.setMinWidth(80);
         dateCol.setOnEditCommit((TableColumn.CellEditEvent<Profile, String> event) -> {
             TablePosition<Profile, String> pos = event.getTablePosition();
 
@@ -462,7 +498,7 @@ public class Controller {
         sexCol.setCellValueFactory(new PropertyValueFactory<>("gender"));
         sexCol.setCellValueFactory(new PropertyValueFactory<>("birthDate"));
         sexCol.setCellFactory(TextFieldTableCell.<Profile>forTableColumn());
-        sexCol.setMinWidth(90);
+        sexCol.setMinWidth(80);
         sexCol.setOnEditCommit((TableColumn.CellEditEvent<Profile, String> event) -> {
             TablePosition<Profile, String> pos = event.getTablePosition();
 
@@ -476,7 +512,7 @@ public class Controller {
 
         emailCol.setCellValueFactory(new PropertyValueFactory<>("email"));
         emailCol.setCellFactory(TextFieldTableCell.<Profile>forTableColumn());
-        emailCol.setMinWidth(180);
+        emailCol.setMinWidth(170);
         emailCol.setOnEditCommit((TableColumn.CellEditEvent<Profile, String> event) -> {
             TablePosition<Profile, String> pos = event.getTablePosition();
 
@@ -504,7 +540,7 @@ public class Controller {
 
         cellularCol.setCellValueFactory(new PropertyValueFactory<>("cellular"));
         cellularCol.setCellFactory(TextFieldTableCell.<Profile>forTableColumn());
-        cellularCol.setMinWidth(110);
+        cellularCol.setMinWidth(100);
         cellularCol.setOnEditCommit((TableColumn.CellEditEvent<Profile, String> event) -> {
             TablePosition<Profile, String> pos = event.getTablePosition();
 
@@ -515,7 +551,20 @@ public class Controller {
 
             person.setCellular(newCellular);
         });
+        statusCol.setCellValueFactory(new PropertyValueFactory<>("status"));
+        statusCol.setCellFactory(TextFieldTableCell.<Profile>forTableColumn());
+        statusCol.setMinWidth(100);
+        statusCol.setOnEditCommit((TableColumn.CellEditEvent<Profile, String> event) -> {
+            TablePosition<Profile, String> pos = event.getTablePosition();
 
+            String newStatus = event.getNewValue();
+
+            int row = pos.getRow();
+            Profile person = event.getTableView().getItems().get(row);
+
+            person.setStatus(newStatus);
+        });
+        idCol.setSortType(TableColumn.SortType.DESCENDING);
         surnameCol.setSortType(TableColumn.SortType.DESCENDING);
         nameCol.setSortType(TableColumn.SortType.DESCENDING);
         patronymicCol.setSortType(TableColumn.SortType.DESCENDING);
@@ -524,8 +573,14 @@ public class Controller {
         emailCol.setSortType(TableColumn.SortType.DESCENDING);
         studentNumberCol.setSortType(TableColumn.SortType.DESCENDING);
         cellularCol.setSortType(TableColumn.SortType.DESCENDING);
+        statusCol.setSortType(TableColumn.SortType.DESCENDING);
 
-        viewTable.getColumns().addAll(surnameCol, nameCol, patronymicCol, dateCol, sexCol, emailCol, studentNumberCol, cellularCol);
+        viewTable.getColumns().addAll(idCol, surnameCol, nameCol, patronymicCol, dateCol, sexCol, emailCol, studentNumberCol, cellularCol, statusCol);
 
+    }
+
+    @Override
+    public void run() {
+        viewTable.refresh();
     }
 }

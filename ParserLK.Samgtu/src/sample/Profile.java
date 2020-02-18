@@ -1,7 +1,7 @@
 package sample;
 
 public class Profile {
-    private Long id;
+    private int id;
     private String email;
     private String cellular;
     private String lastName;
@@ -9,16 +9,16 @@ public class Profile {
     private String gender;
     private String middleName;
     private String birthDate;
-    private String documentTypeId;
     private String documentNumber;
     private String agreement;
-    private Status status;
+  // private Status status;
+private String status;
 
-    public Long getId() {
+    public int getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(int id) {
         this.id = id;
     }
 
@@ -86,14 +86,6 @@ public class Profile {
         this.birthDate = Double.toString(birthDate);
     }
 
-    public String getDocumentTypeId() {
-        return documentTypeId;
-    }
-
-    public void setDocumentTypeId(String documentTypeId) {
-        this.documentTypeId = documentTypeId;
-    }
-
     public String getDocumentNumber() {
         return documentNumber;
     }
@@ -112,5 +104,13 @@ public class Profile {
 
     public void setAgreement(String agreement) {
         this.agreement = agreement;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }
