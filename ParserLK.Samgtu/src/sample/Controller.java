@@ -38,7 +38,7 @@ import java.net.URL;
 import java.util.*;
 
 
-public class Controller implements Runnable {
+public class Controller {
 
     @FXML
     private ResourceBundle resources;
@@ -72,21 +72,30 @@ public class Controller implements Runnable {
     List<Profile> listProfile = new ArrayList<>();
     Profile newProfile;
     ObservableList<Profile> list = null;
-
-    class UpdateTable extends Thread {
-        @Override
-        public void run() {
-            viewTable.refresh();
-        }
-    }
+    HSSFWorkbook workbook = null;
+    XSSFWorkbook workbookXSSF = null;
+    XSSFSheet sheetXSSF = null;
+    HSSFSheet sheet = null;
+    String fileExtension;
+//    class UpdateTable extends Thread {
+//       UpdateTable() {
+//           super("Второй поток");
+//           System.out.println("Создан 2-ой поток");
+//           start();
+//       }
+//        public void run() {
+//            System.out.println("Работает 2-ой поток");
+//            viewTable.refresh();
+//        }
+//    }
 
     @FXML
     void signUpEvent(MouseEvent event) throws IOException, InterruptedException {
         if (list != null) {
             ObservableList<Profile> listUpdate = FXCollections.observableArrayList(listProfile);
             lbStatus.setText("Идет регистрация");
-            for (Profile profile : list) {
-//            Profile profile = list.get(0);
+//            for (Profile profile : list) {
+            Profile profile = list.get(0);
 
                 try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 
@@ -123,7 +132,7 @@ public class Controller implements Runnable {
                     // Create a custom response handler
                     ResponseHandler<String> responseHandler = response -> {
                         int status = response.getStatusLine().getStatusCode();
-                        if (status >= 200 && status < 300) {
+                        if (status >= 200 && status < 303) {
                             HttpEntity responseEntity = response.getEntity();
                             return responseEntity != null ? EntityUtils.toString(responseEntity) : null;
                         } else {
@@ -138,27 +147,32 @@ public class Controller implements Runnable {
                         System.out.println("Такой пользователь уже зарегистрирован");
                         profile.setStatus("Существует");
 
+                        writeExcel(profile);
+
                     } else if (responseBody.lastIndexOf(DONT_EXISTS) != -1) {
                         System.out.println("Не найден ни в одной базе");
                         profile.setStatus("Не существует");
-
+                        writeExcel(profile);
                     } else {
                         System.out.println("Может быть зарегистрирован");
                         profile.setStatus("Не зарегистрирован");
-
+                        registrationTwoStep(profile);
                     }
-                    UpdateTable updateTable = new UpdateTable();
-                    updateTable.start();
-                    updateTable.join();
+
                 } catch (Exception e) {
+                    profile.setStatus("Ошибка");
                     System.out.println("упс...");
                 }
                 viewTable.refresh();
-
-            }
+//            }
         } else {
             lbStatus.setText("Не выбран файл");
         }
+    }
+
+    public void registrationTwoStep(Profile profile) {
+
+
     }
 
     //Парсинг xls
@@ -372,21 +386,38 @@ public class Controller implements Runnable {
         excelRead();
     }
 
+    public void writeExcel(Profile profile) throws IOException {
+
+        FileOutputStream out = new FileOutputStream(fileObject);
+
+        if (fileExtension.equals(".xls")) {
+            sheet.getRow(0).createCell(22, CellType.STRING).setCellValue("Статус");
+            sheet.getRow(profile.getId()).createCell(22, CellType.STRING).setCellValue(profile.getStatus());
+            workbook.write(out);
+        } else if (fileExtension.equals(".xlsx")) {
+            sheetXSSF.getRow(0).createCell(22, CellType.STRING).setCellValue("Статус");
+            sheetXSSF.getRow(profile.getId()).createCell(22, CellType.STRING).setCellValue(profile.getStatus());
+            workbookXSSF.write(out);
+        }
+
+        out.close();
+    }
+
     // Считывание Excel файла (2 формата)
     public void excelRead() {
 
         listProfile.clear();
         try {
             FileInputStream inputStream = new FileInputStream(fileObject);
-            String fileExtension = getFileExtension(fileObject.getName());
+            fileExtension = getFileExtension(fileObject.getName());
             if (fileExtension.equals(".xls")) {
-                HSSFWorkbook workbook = new HSSFWorkbook(inputStream);
-                HSSFSheet sheet = workbook.getSheetAt(0);
+                workbook = new HSSFWorkbook(inputStream);
+                sheet = workbook.getSheetAt(0);
                 parserExcelXLS(sheet);
             } else if (fileExtension.equals(".xlsx")) {
-                XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
-                XSSFSheet sheet = workbook.getSheetAt(0);
-                parserExcelXLS(sheet);
+                workbookXSSF = new XSSFWorkbook(inputStream);
+                sheetXSSF = workbookXSSF.getSheetAt(0);
+                parserExcelXLS(sheetXSSF);
             }
             setViewTable(true);
         } catch (Exception e) {
@@ -496,7 +527,6 @@ public class Controller implements Runnable {
 
         //TODO: Combobox
         sexCol.setCellValueFactory(new PropertyValueFactory<>("gender"));
-        sexCol.setCellValueFactory(new PropertyValueFactory<>("birthDate"));
         sexCol.setCellFactory(TextFieldTableCell.<Profile>forTableColumn());
         sexCol.setMinWidth(80);
         sexCol.setOnEditCommit((TableColumn.CellEditEvent<Profile, String> event) -> {
@@ -579,8 +609,4 @@ public class Controller implements Runnable {
 
     }
 
-    @Override
-    public void run() {
-        viewTable.refresh();
-    }
 }
