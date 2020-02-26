@@ -94,9 +94,11 @@ public class Profile {
             return "1";
         } else if (gender == "Женщина") {
             return "0";
+        } else if (gender == "*Мужчина") {
+            return "*1";
+
         } else {
             return gender;
-
         }
 
     }

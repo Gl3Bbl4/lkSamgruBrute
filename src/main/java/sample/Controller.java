@@ -1,11 +1,11 @@
 package sample;
 
+
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -92,7 +92,11 @@ public class Controller {
             form.add(new BasicNameValuePair("SignupFormNew[LastName]", profile.getLastName()));
             form.add(new BasicNameValuePair("SignupFormNew[FirstName]", profile.getFirstName()));
             form.add(new BasicNameValuePair("SignupFormNew[Gender]", ""));
-            form.add(new BasicNameValuePair("SignupFormNew[Gender]", profile.getGender()));
+            if (profile.getGender() != "*1") {
+                form.add(new BasicNameValuePair("SignupFormNew[Gender]", profile.getGender()));
+            } else {
+                form.add(new BasicNameValuePair("SignupFormNew[Gender]", "1"));
+            }
             form.add(new BasicNameValuePair("SignupFormNew[MiddleName]", profile.getMiddleName()));
             form.add(new BasicNameValuePair("SignupFormNew[BirthDate]", profile.getBirthDate()));
             form.add(new BasicNameValuePair("SignupFormNew[DocumentTypeID]", "1"));
@@ -167,6 +171,18 @@ public class Controller {
         });
     }
 
+    public void clearStatusForChoose(){
+        if (list != null) {
+            for (Profile profile: list
+                 ) {
+                if (profile.isCheckReg() && profile.getStatus()!=null) {
+                    profile.setStatus("*");
+                }
+            }
+        }
+        viewTable.refresh();
+    }
+
     @FXML
     void checkSignUpEvent(MouseEvent event) {
         if (list != null) {
@@ -181,7 +197,9 @@ public class Controller {
             }
             lbStatus.setText("Идет проверка");
 
+
             new Thread(() -> {
+                clearStatusForChoose();
                 try {
                     boolean writed = false;
                     for (Profile profile : list) {
@@ -209,11 +227,11 @@ public class Controller {
             }).start();
 
 
-            lbStatus.setText("Проверка завершена");
+
         } else {
             lbStatus.setText("Не выбран файл");
         }
-
+        lbStatus.setText("Проверка завершена");
     }
 
 
@@ -230,10 +248,11 @@ public class Controller {
             }
             lbStatus.setText("Идет регистрация");
             new Thread(() -> {
+                clearStatusForChoose();
                 try {
                     boolean writed = false;
                     for (Profile profile : list) {
-                        if (profile.getStatus() == null && profile.isCheckReg() == true) {
+                        if (profile.isCheckReg() == true) {
 
                             String responseBody = request(profile, FIRST_REQUEST);
                             System.out.println("----------------------------------------");
@@ -268,10 +287,11 @@ public class Controller {
                 }
             }).start();
 
-            lbStatus.setText("Регистрация завершена");
+
         } else {
             lbStatus.setText("Не выбран файл");
         }
+        lbStatus.setText("Регистрация завершена");
     }
 
     public void save() {
@@ -345,33 +365,31 @@ public class Controller {
                                 newProfile.setLastName(listFIO.get(0));
                                 newProfile.setFirstName(listFIO.get(1));
                                 newProfile.setMiddleName(listFIO.get(2));
+                                int last = newProfile.getMiddleName().length() - 1;
+                                char ch = newProfile.getMiddleName().charAt(last);
+                                if (ch == 'а') {
+                                    newProfile.setGender("Женщина");
+                                } else {
+                                    newProfile.setGender("Мужчина");
+                                }
                             } else {
-                                newProfile.setLastName(listFIO.get(1));
-                                newProfile.setFirstName(listFIO.get(0));
+                                newProfile.setLastName(listFIO.get(0));
 
-                                for (int i = 2; i < listFIO.size(); i++) {
-                                    if (newProfile.getMiddleName() != null) {
-                                        newProfile.setMiddleName(newProfile.getMiddleName() + " " + listFIO.get(i));
+                                for (int i = 1; i < listFIO.size(); i++) {
+                                    if (newProfile.getFirstName() != null) {
+                                        newProfile.setFirstName(newProfile.getFirstName() + " " + listFIO.get(i));
                                     } else {
-                                        newProfile.setMiddleName(listFIO.get(i));
+                                        newProfile.setFirstName(listFIO.get(i));
                                     }
                                 }
-
-                                newProfile.setMiddleName(newProfile.getMiddleName().trim());
+                                newProfile.setGender("*Мужчина");
+                                newProfile.setFirstName(newProfile.getFirstName().trim());
+                                newProfile.setMiddleName("");
                             }
-
-
-                            int last = newProfile.getMiddleName().length() - 1;
-                            char ch = newProfile.getMiddleName().charAt(last);
-                            if (ch == 'а') {
-                                newProfile.setGender("Женщина");
-                            } else {
-                                newProfile.setGender("Мужчина");
-                            }
-                            listFIO.remove(listFIO.get(listFIO.size() - 1));
                             break;
                         case 1:
                             cell = cellIterator.next();
+
                             if (cell.getCellType() == CellType.STRING) {
                                 newProfile.setBirthDate(cell.getStringCellValue());
 
@@ -383,6 +401,7 @@ public class Controller {
 
                         case 6:
                             cell = cellIterator.next();
+                            cell.setCellType(CellType.STRING);
                             if (cell.getCellType() != CellType.NUMERIC) {
                                 newProfile.setDocumentNumberStr(cell.getStringCellValue());
                             } else {
@@ -391,11 +410,14 @@ public class Controller {
                             break;
 
                         case 14:
-                            newProfile.setEmail(cellIterator.next().getStringCellValue());
+                            cell = cellIterator.next();
+                            cell.setCellType(CellType.STRING);
+                            newProfile.setEmail(cell.getStringCellValue());
                             break;
 
                         case 18:
                             cell = cellIterator.next();
+                            cell.setCellType(CellType.STRING);
                             if (cell.getCellType() != CellType.NUMERIC) {
                                 newProfile.setCellular(cell.getStringCellValue());
                             } else {
@@ -414,8 +436,7 @@ public class Controller {
                         default:
                             try {
                                 cell = cellIterator.next();
-                            }
-                            catch ( Exception e){
+                            } catch (Exception e) {
 
                             }
                             break;
